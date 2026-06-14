@@ -8,25 +8,27 @@ from telegram.ext import Application
 
 from config import get_settings
 from bot.handlers import register_handlers
+from db.models import create_tables
 
 
 def configure_logging(log_level: int) -> None:
     """Set up root logger and silence noisy third-party libraries."""
+
     logging.basicConfig(
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         level=log_level,
         stream=sys.stdout,
     )
-    # PTB's httpx transport is very chatty at DEBUG — keep it at WARNING
-    # unless the caller explicitly wants DEBUG-level PTB internals.
+
     if log_level > logging.DEBUG:
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 def build_application(token: str) -> Application:
-    """Construct and return a configured Telegram Application instance."""
+    """Construct and return Telegram application."""
+
     return (
         Application.builder()
         .token(token)
@@ -35,9 +37,11 @@ def build_application(token: str) -> Application:
 
 
 def main() -> None:
+
     settings = get_settings()
 
     configure_logging(settings.log_level_int)
+
     logger = logging.getLogger(__name__)
 
     logger.info(
@@ -47,16 +51,24 @@ def main() -> None:
         settings.log_level,
     )
 
-    app = build_application(settings.bot_token)
+    # Database bootstrap
+    create_tables()
+
+    logger.info("Database ready.")
+
+    # Telegram bot
+    app = build_application(
+        settings.bot_token
+    )
 
     register_handlers(app)
-    logger.info("Handlers registered — entering polling loop.")
+
+    logger.info(
+        "Handlers registered — entering polling loop."
+    )
 
     app.run_polling(
-        # Drop any updates that arrived while the bot was offline so users
-        # don't receive stale responses on restart.
         drop_pending_updates=True,
-        # Log a clean shutdown message instead of letting PTB print a traceback.
         close_loop=True,
     )
 
