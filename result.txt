@@ -1,0 +1,7 @@
+2026-06-14 22:52:56 | INFO     | __main__ | Starting Travel Booking Confidence Engine (python-telegram-bot 22.1, log_level=INFO)
+2026-06-14 22:52:56 | INFO     | bot.handlers | All command handlers registered.
+2026-06-14 22:52:56 | INFO     | __main__ | Handlers registered — entering polling loop.
+2026-06-14 22:52:58 | INFO     | telegram.ext.Application | Application started
+2026-06-14 22:53:02 | INFO     | telegram.ext.Application | Application is stopping. This might take a moment.
+2026-06-14 22:53:02 | INFO     | telegram.ext.Application | Application.stop() complete
+2026-06-14 22:53:02 | INFO     | __main__ | Bot stopped cleanly.
