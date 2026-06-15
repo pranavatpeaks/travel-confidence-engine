@@ -17,8 +17,7 @@ from core.tracker import (
 )
 
 from db.fare_repository import (
-    get_latest_fare_for_tracker,
-    get_lowest_fare_for_tracker,
+    get_cheapest_options_for_tracker,
 )
 
 from scrapers.city_resolver import (
@@ -155,22 +154,18 @@ async def status_handler(
         ""
     ]
 
+    medals = [
+        "🥇",
+        "🥈",
+        "🥉",
+    ]
+
     for tracker in trackers:
 
-        latest = get_latest_fare_for_tracker(
-            tracker["id"]
+        cheapest = get_cheapest_options_for_tracker(
+            tracker["id"],
+            limit=3,
         )
-
-        lowest = get_lowest_fare_for_tracker(
-            tracker["id"]
-        )
-
-        logger.info(
-    "Tracker=%s Latest=%s Lowest=%s",
-    tracker["id"],
-    latest,
-    lowest,
-)
 
         lines.append(
             "━━━━━━━━━━━━━━"
@@ -186,31 +181,40 @@ async def status_handler(
             f"Date: {tracker['journey_date']}"
         )
 
-        if latest:
-
-            lines.append("")
-
-            lines.append(
-                f"Latest Fare: ₹{latest['fare']}"
-            )
-
-            lines.append(
-                f"Operator: {latest['operator']}"
-            )
-
-            lines.append(
-                f"Seats: {latest['seats_available']}"
-            )
-
-        if lowest:
-
-            lines.append("")
-
-            lines.append(
-                f"Lowest Fare Seen: ₹{lowest['fare']}"
-            )
-
         lines.append("")
+
+        if not cheapest:
+
+            lines.append(
+                "No observations yet."
+            )
+
+            lines.append("")
+            continue
+
+        for idx, bus in enumerate(
+            cheapest
+        ):
+
+            medal = medals[idx]
+
+            lines.append(
+                f"{medal} ₹{bus['fare']}"
+            )
+
+            lines.append(
+                bus["operator"]
+            )
+
+            lines.append(
+                bus["bus_type"]
+            )
+
+            lines.append(
+                f"Seats: {bus['seats_available']}"
+            )
+
+            lines.append("")
 
     await update.message.reply_text(
         "\n".join(lines)
