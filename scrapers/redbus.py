@@ -33,7 +33,9 @@ class RedBusScraper:
         journey_date: date | str,
     ) -> list[FareObservation]:
 
-        formatted_date = self._format_date(journey_date)
+        formatted_date = self._format_date(
+            journey_date
+        )
 
         payload = self._fetch(
             source_city_id=source_city_id,
@@ -41,7 +43,9 @@ class RedBusScraper:
             formatted_date=formatted_date,
         )
 
-        return self._parse_payload(payload)
+        return self._parse_payload(
+            payload
+        )
 
     def _fetch(
         self,
@@ -60,12 +64,19 @@ class RedBusScraper:
             "&meta=true"
         )
 
-        logger.info("Calling RedBus API")
-        logger.info(url)
+        logger.info(
+            "Calling RedBus API"
+        )
+
+        logger.info(
+            url
+        )
 
         response = requests.post(
             url,
-            json={"appliedFilterCount": 0},
+            json={
+                "appliedFilterCount": 0
+            },
             timeout=self.timeout,
         )
 
@@ -73,7 +84,9 @@ class RedBusScraper:
 
         payload = response.json()
 
-        if not payload.get("success"):
+        if not payload.get(
+            "success"
+        ):
             raise RedBusAPIError(
                 "RedBus API returned success=False"
             )
@@ -85,17 +98,17 @@ class RedBusScraper:
         payload: dict,
     ) -> list[FareObservation]:
 
-        inventories = payload["data"]["inventories"]
+        inventories = payload[
+            "data"
+        ][
+            "inventories"
+        ]
 
         logger.info(
             "Received %d buses from RedBus",
             len(inventories),
         )
 
-        # --------------------------------------------------
-        # DEBUG: Print first bus completely
-        # Remove after inspection
-        # --------------------------------------------------
         if inventories:
 
             logger.info(
@@ -116,19 +129,27 @@ class RedBusScraper:
 
             logger.info(
                 "Available keys: %s",
-                sorted(inventories[0].keys()),
+                sorted(
+                    inventories[0].keys()
+                ),
             )
 
-        observations: list[FareObservation] = []
+        observations: list[
+            FareObservation
+        ] = []
 
-        observed_at = datetime.now(UTC)
+        observed_at = datetime.now(
+            UTC
+        )
 
         for bus in inventories:
 
             try:
 
                 operator = (
-                    bus["travelsName"]
+                    bus[
+                        "travelsName"
+                    ]
                     .strip()
                 )
 
@@ -154,33 +175,77 @@ class RedBusScraper:
                     dict,
                 ):
                     fare = min(
-                        int(item["fare"])
-                        for item in fare_list
+                        int(
+                            item["fare"]
+                        )
+                        for item
+                        in fare_list
                     )
                 else:
                     fare = min(
                         int(item)
-                        for item in fare_list
+                        for item
+                        in fare_list
                     )
 
-                bus_type = (
+                bus_type = bus.get(
+                    "busType",
+                    "Unknown",
+                )
+
+                is_ac = bool(
                     bus.get(
-                        "busType",
-                        "Unknown",
+                        "isAc",
+                        False,
                     )
                 )
-                is_ac = (bool(bus.get("isAC", False)))     
-                is_sleeper = (bool(bus.get("isSleeper", False)))
+
+                is_sleeper = bool(
+                    bus.get(
+                        "isSleeper",
+                        False,
+                    )
+                )
+
+                departure_time = bus.get(
+                    "departureTime",
+                    "",
+                )
+
+                arrival_time = bus.get(
+                    "arrivalTime",
+                    "",
+                )
+
+                journey_duration_min = int(
+                    bus.get(
+                        "journeyDurationMin",
+                        0,
+                    )
+                )
 
                 observations.append(
                     FareObservation(
                         platform="redbus",
+
                         operator=operator,
+
                         bus_type=bus_type,
+
                         is_ac=is_ac,
+
                         is_sleeper=is_sleeper,
+
+                        departure_time=departure_time,
+
+                        arrival_time=arrival_time,
+
+                        journey_duration_min=journey_duration_min,
+
                         fare=fare,
-                        seats_available=seats,     
+
+                        seats_available=seats,
+
                         observed_at=observed_at,
                     )
                 )
@@ -218,10 +283,14 @@ class RedBusScraper:
             f"{journey_date.strftime('%b-%Y')}"
         )
 
-    def close(self) -> None:
+    def close(
+        self,
+    ) -> None:
         pass
 
-    def __enter__(self):
+    def __enter__(
+        self,
+    ):
         return self
 
     def __exit__(
