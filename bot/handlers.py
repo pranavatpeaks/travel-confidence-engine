@@ -166,8 +166,8 @@ async def status_handler(
         lines.append(
             (
                 f"#{tracker['id']} "
-                f"{tracker['source']} → "
-                f"{tracker['destination']}"
+                f"{tracker['source_name']} → "
+                f"{tracker['destination_name']}"
             )
         )
 
