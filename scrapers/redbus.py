@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from datetime import date, datetime, UTC
 
@@ -73,7 +74,9 @@ class RedBusScraper:
         payload = response.json()
 
         if not payload.get("success"):
-            raise RedBusAPIError("RedBus API returned success=False")
+            raise RedBusAPIError(
+                "RedBus API returned success=False"
+            )
 
         return payload
 
@@ -84,6 +87,38 @@ class RedBusScraper:
 
         inventories = payload["data"]["inventories"]
 
+        logger.info(
+            "Received %d buses from RedBus",
+            len(inventories),
+        )
+
+        # --------------------------------------------------
+        # DEBUG: Print first bus completely
+        # Remove after inspection
+        # --------------------------------------------------
+        if inventories:
+
+            logger.info(
+                "========== FIRST BUS OBJECT =========="
+            )
+
+            logger.info(
+                json.dumps(
+                    inventories[0],
+                    indent=2,
+                    default=str,
+                )
+            )
+
+            logger.info(
+                "========== END BUS OBJECT =========="
+            )
+
+            logger.info(
+                "Available keys: %s",
+                sorted(inventories[0].keys()),
+            )
+
         observations: list[FareObservation] = []
 
         observed_at = datetime.now(UTC)
@@ -91,39 +126,75 @@ class RedBusScraper:
         for bus in inventories:
 
             try:
-                operator = bus["travelsName"].strip()
 
-                seats = int(bus.get("availableSeats", 0))
+                operator = (
+                    bus["travelsName"]
+                    .strip()
+                )
 
-                fare_list = bus.get("fareList", [])
+                seats = int(
+                    bus.get(
+                        "availableSeats",
+                        0,
+                    )
+                )
+
+                fare_list = bus.get(
+                    "fareList",
+                    [],
+                )
 
                 if not fare_list:
                     continue
 
                 first_item = fare_list[0]
 
-                if isinstance(first_item, dict):
-                    fare = min(int(item["fare"]) for item in fare_list)
+                if isinstance(
+                    first_item,
+                    dict,
+                ):
+                    fare = min(
+                        int(item["fare"])
+                        for item in fare_list
+                    )
                 else:
-                    fare = min(int(item) for item in fare_list)
+                    fare = min(
+                        int(item)
+                        for item in fare_list
+                    )
+
+                bus_type = (
+                    bus.get(
+                        "busType",
+                        "Unknown",
+                    )
+                )
+                is_ac = (bool(bus.get("isAC", False)))     
+                is_sleeper = (bool(bus.get("isSleeper", False)))
 
                 observations.append(
                     FareObservation(
                         platform="redbus",
                         operator=operator,
+                        bus_type=bus_type,
+                        is_ac=is_ac,
+                        is_sleeper=is_sleeper,
                         fare=fare,
-                        seats_available=seats,
+                        seats_available=seats,     
                         observed_at=observed_at,
                     )
                 )
 
             except Exception as exc:
+
                 logger.warning(
                     "Skipping malformed inventory: %s",
                     exc,
                 )
 
-        observations.sort(key=lambda x: x.fare)
+        observations.sort(
+            key=lambda x: x.fare
+        )
 
         return observations
 
@@ -132,10 +203,20 @@ class RedBusScraper:
         journey_date: date | str,
     ) -> str:
 
-        if isinstance(journey_date, str):
-            journey_date = date.fromisoformat(journey_date)
+        if isinstance(
+            journey_date,
+            str,
+        ):
+            journey_date = (
+                date.fromisoformat(
+                    journey_date
+                )
+            )
 
-        return f"{journey_date.day}-{journey_date.strftime('%b-%Y')}"
+        return (
+            f"{journey_date.day}-"
+            f"{journey_date.strftime('%b-%Y')}"
+        )
 
     def close(self) -> None:
         pass
@@ -143,5 +224,8 @@ class RedBusScraper:
     def __enter__(self):
         return self
 
-    def __exit__(self, *args):
+    def __exit__(
+        self,
+        *args,
+    ):
         self.close()

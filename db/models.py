@@ -3,12 +3,13 @@ from __future__ import annotations
 import logging
 import sqlite3
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from typing import Optional
 
 from db.database import connection
 
 logger = logging.getLogger(__name__)
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # TRACKERS TABLE
@@ -30,14 +31,8 @@ CREATE TABLE IF NOT EXISTS trackers (
 
     active INTEGER NOT NULL DEFAULT 1,
 
-    created_at TEXT NOT NULL
-        DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-
-    UNIQUE(
-        chat_id,
-        source_name,
-        destination_name,
-        journey_date
+    created_at TEXT NOT NULL DEFAULT (
+        STRFTIME('%Y-%m-%dT%H:%M:%fZ', 'NOW')
     )
 );
 """
@@ -52,6 +47,7 @@ CREATE INDEX IF NOT EXISTS idx_trackers_journey_date
 ON trackers(journey_date);
 """
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # FARE OBSERVATIONS TABLE
 # ──────────────────────────────────────────────────────────────────────────────
@@ -63,9 +59,17 @@ CREATE TABLE IF NOT EXISTS fare_observations (
     tracker_id INTEGER NOT NULL,
 
     platform TEXT NOT NULL,
+
     operator TEXT NOT NULL,
 
+    bus_type TEXT NOT NULL,
+
+    is_ac INTEGER NOT NULL,
+
+    is_sleeper INTEGER NOT NULL,
+
     fare INTEGER NOT NULL,
+
     seats_available INTEGER NOT NULL,
 
     observed_at TEXT NOT NULL,
@@ -85,6 +89,7 @@ CREATE INDEX IF NOT EXISTS idx_fare_observed_at
 ON fare_observations(observed_at);
 """
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # TRACKER MODEL
 # ──────────────────────────────────────────────────────────────────────────────
@@ -92,26 +97,45 @@ ON fare_observations(observed_at);
 @dataclass(frozen=True, slots=True)
 class Tracker:
     chat_id: str
+
     source_name: str
     source_id: int
+
     destination_name: str
     destination_id: int
-    journey_date: date
+
+    journey_date: str
+
     active: bool = True
+
     id: Optional[int] = None
+
     created_at: Optional[datetime] = None
 
     @classmethod
-    def from_row(cls, row: sqlite3.Row) -> "Tracker":
+    def from_row(
+        cls,
+        row: sqlite3.Row,
+    ) -> "Tracker":
+
         return cls(
             id=row["id"],
             chat_id=row["chat_id"],
-            source=row["source"],
-            destination=row["destination"],
-            journey_date=date.fromisoformat(row["journey_date"]),
+
+            source_name=row["source_name"],
+            source_id=row["source_id"],
+
+            destination_name=row["destination_name"],
+            destination_id=row["destination_id"],
+
+            journey_date=row["journey_date"],
+
             active=bool(row["active"]),
+
             created_at=(
-                datetime.fromisoformat(row["created_at"])
+                datetime.fromisoformat(
+                    row["created_at"]
+                )
                 if row["created_at"]
                 else None
             ),
@@ -119,25 +143,57 @@ class Tracker:
 
     @property
     def route_label(self) -> str:
-        return f"{self.source} → {self.destination}"
+
+        return (
+            f"{self.source_name} → "
+            f"{self.destination_name}"
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # TABLE CREATION
 # ──────────────────────────────────────────────────────────────────────────────
 
-def create_tables(db_path: str | None = None) -> None:
-    kwargs = {"db_path": db_path} if db_path is not None else {}
+def create_tables(
+    db_path: str | None = None,
+) -> None:
 
-    logger.info("Creating tables (if not exist).")
+    kwargs = (
+        {"db_path": db_path}
+        if db_path is not None
+        else {}
+    )
+
+    logger.info(
+        "Creating tables (if not exist)."
+    )
 
     with connection(**kwargs) as conn:
-        conn.execute(_CREATE_TRACKERS)
-        conn.execute(_CREATE_IDX_CHAT_ACTIVE)
-        conn.execute(_CREATE_IDX_JOURNEY_DATE)
 
-        conn.execute(_CREATE_FARE_OBSERVATIONS)
-        conn.execute(_CREATE_IDX_FARE_TRACKER_ID)
-        conn.execute(_CREATE_IDX_FARE_OBSERVED_AT)
+        conn.execute(
+            _CREATE_TRACKERS
+        )
 
-    logger.info("Database tables ready.")
+        conn.execute(
+            _CREATE_IDX_CHAT_ACTIVE
+        )
+
+        conn.execute(
+            _CREATE_IDX_JOURNEY_DATE
+        )
+
+        conn.execute(
+            _CREATE_FARE_OBSERVATIONS
+        )
+
+        conn.execute(
+            _CREATE_IDX_FARE_TRACKER_ID
+        )
+
+        conn.execute(
+            _CREATE_IDX_FARE_OBSERVED_AT
+        )
+
+    logger.info(
+        "Database tables ready."
+    )

@@ -14,23 +14,29 @@ def insert_fare_observation(
     with connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO fare_observations (
+                        INSERT INTO fare_observations (
                 tracker_id,
                 platform,
                 operator,
+                bus_type,
+                is_ac,
+                is_sleeper,
                 fare,
                 seats_available,
                 observed_at
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                tracker_id,
-                observation.platform,
-                observation.operator,
-                observation.fare,
-                observation.seats_available,
-                observation.observed_at.isoformat(),
+                    tracker_id,
+                    observation.platform,
+                    observation.operator,
+                    observation.bus_type,
+                    int(observation.is_ac),
+                    int(observation.is_sleeper),
+                    observation.fare,
+                    observation.seats_available,
+                    observation.observed_at.isoformat(),
             ),
         )
 
@@ -200,3 +206,43 @@ def get_tracker_statistics(
             else None
         ),
     }
+
+def get_cheapest_options_for_tracker(
+    tracker_id: int,
+    limit: int = 3,
+) -> list[dict]:
+
+    with connection() as conn:
+
+        latest_timestamp = conn.execute(
+            """
+            SELECT MAX(observed_at)
+            FROM fare_observations
+            WHERE tracker_id = ?
+            """,
+            (tracker_id,),
+        ).fetchone()[0]
+
+        if not latest_timestamp:
+            return []
+
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM fare_observations
+            WHERE tracker_id = ?
+              AND observed_at = ?
+            ORDER BY fare ASC
+            LIMIT ?
+            """,
+            (
+                tracker_id,
+                latest_timestamp,
+                limit,
+            ),
+        ).fetchall()
+
+    return [
+        dict(row)
+        for row in rows
+    ]

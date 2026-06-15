@@ -3,6 +3,26 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, UTC
 
+from dataclasses import dataclass
+from datetime import datetime
+
+
+@dataclass(slots=True)
+class FareObservation:
+    platform: str
+
+    operator: str
+
+    bus_type: str
+
+    is_ac: bool
+    is_sleeper: bool
+
+    fare: int
+
+    seats_available: int
+
+    observed_at: datetime
 
 @dataclass(frozen=True, slots=True)
 class FareObservation:
