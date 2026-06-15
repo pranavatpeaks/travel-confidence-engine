@@ -263,6 +263,8 @@ async def status_handler(
                     int(duration) % 60
                 )
 
+                logger.info(bus)
+
                 lines.append(
                     f"⏱ {hours}h {minutes}m"
                 )
