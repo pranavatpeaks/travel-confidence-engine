@@ -17,12 +17,12 @@ scheduler = BlockingScheduler()
 scheduler.add_job(
     scheduled_job,
     trigger="interval",
-    minutes=1,
+    hours=1,
 )
 
 print(
     "Scheduler started "
-    "(collecting every 1 minute)"
+    "(collecting every 1 hour)"
 )
 
 scheduler.start()
