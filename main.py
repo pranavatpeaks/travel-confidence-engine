@@ -8,10 +8,6 @@ from telegram.ext import Application
 
 from bot.handlers import register_handlers
 from config import get_settings
-from core.scheduler import (
-    start_scheduler,
-    stop_scheduler,
-)
 from db.models import create_tables
 
 
@@ -29,7 +25,9 @@ def configure_logging(log_level: int) -> None:
         logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
-def build_application(token: str) -> Application:
+def build_application(
+    token: str,
+) -> Application:
 
     return (
         Application.builder()
@@ -61,8 +59,6 @@ def main() -> None:
         "Database ready."
     )
 
-    start_scheduler()
-
     app = build_application(
         settings.bot_token
     )
@@ -73,20 +69,10 @@ def main() -> None:
         "Handlers registered — entering polling loop."
     )
 
-    try:
-
-        app.run_polling(
-            drop_pending_updates=True,
-            close_loop=True,
-        )
-
-    finally:
-
-        stop_scheduler()
-
-        logger.info(
-            "Bot stopped cleanly."
-        )
+    app.run_polling(
+        drop_pending_updates=True,
+        close_loop=True,
+    )
 
 
 if __name__ == "__main__":
