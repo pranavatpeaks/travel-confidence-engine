@@ -10,8 +10,59 @@ class TrackRequest:
     destination: str
     journey_date: date
 
-
 def parse_track_command(text: str) -> TrackRequest:
+    """
+    Parse:
+
+    /track Hyderabad Bangalore 2026-07-01
+    """
+
+    if not isinstance(text, str):
+        raise TypeError(
+            f"Command text must be a str, got {type(text).__name__!r}."
+        )
+
+    parts = text.strip().split()
+
+    if len(parts) != 4:
+        raise ValueError(
+            "Usage:\n"
+            "/track <SOURCE_CITY> <DESTINATION_CITY> <YYYY-MM-DD>"
+        )
+
+    command, source, destination, raw_date = parts
+
+    if command.lower() != "/track":
+        raise ValueError(
+            "Command must start with /track"
+        )
+
+    if source.lower() == destination.lower():
+        raise ValueError(
+            "Source and destination must be different."
+        )
+
+    try:
+        journey_date = datetime.strptime(
+            raw_date,
+            "%Y-%m-%d",
+        ).date()
+
+    except ValueError:
+        raise ValueError(
+            "Date must be in YYYY-MM-DD format."
+        )
+
+    if journey_date < date.today():
+        raise ValueError(
+            "Journey date cannot be in the past."
+        )
+
+    return TrackRequest(
+        source=source.strip(),
+        destination=destination.strip(),
+        journey_date=journey_date,
+    )
     """Parse a /track command string into a TrackRequest.
 
     Expected format:
@@ -74,4 +125,4 @@ def parse_track_command(text: str) -> TrackRequest:
         source=source,
         destination=destination,
         journey_date=journey_date,
-    )
+    )   

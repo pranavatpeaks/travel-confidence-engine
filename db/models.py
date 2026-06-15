@@ -6,67 +6,103 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Optional
 
-from db.database import connection, get_connection
+from db.database import connection
 
 logger = logging.getLogger(__name__)
 
-# ── DDL ───────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# TRACKERS TABLE
+# ──────────────────────────────────────────────────────────────────────────────
 
 _CREATE_TRACKERS = """
 CREATE TABLE IF NOT EXISTS trackers (
-    id            INTEGER  PRIMARY KEY AUTOINCREMENT,
-    chat_id       TEXT     NOT NULL,
-    source        TEXT     NOT NULL,
-    destination   TEXT     NOT NULL,
-    journey_date  TEXT     NOT NULL,            -- stored as YYYY-MM-DD
-    active        INTEGER  NOT NULL DEFAULT 1,  -- 1 = active, 0 = stopped
-    created_at    TEXT     NOT NULL
-                           DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    UNIQUE (chat_id, source, destination, journey_date)
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    chat_id TEXT NOT NULL,
+
+    source_name TEXT NOT NULL,
+    source_id INTEGER NOT NULL,
+
+    destination_name TEXT NOT NULL,
+    destination_id INTEGER NOT NULL,
+
+    journey_date TEXT NOT NULL,
+
+    active INTEGER NOT NULL DEFAULT 1,
+
+    created_at TEXT NOT NULL
+        DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+
+    UNIQUE(
+        chat_id,
+        source_name,
+        destination_name,
+        journey_date
+    )
 );
 """
 
 _CREATE_IDX_CHAT_ACTIVE = """
 CREATE INDEX IF NOT EXISTS idx_trackers_chat_active
-    ON trackers (chat_id, active);
+ON trackers(chat_id, active);
 """
 
 _CREATE_IDX_JOURNEY_DATE = """
 CREATE INDEX IF NOT EXISTS idx_trackers_journey_date
-    ON trackers (journey_date);
+ON trackers(journey_date);
 """
 
+# ──────────────────────────────────────────────────────────────────────────────
+# FARE OBSERVATIONS TABLE
+# ──────────────────────────────────────────────────────────────────────────────
 
-# ── Dataclass model ───────────────────────────────────────────────────────────
+_CREATE_FARE_OBSERVATIONS = """
+CREATE TABLE IF NOT EXISTS fare_observations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    tracker_id INTEGER NOT NULL,
+
+    platform TEXT NOT NULL,
+    operator TEXT NOT NULL,
+
+    fare INTEGER NOT NULL,
+    seats_available INTEGER NOT NULL,
+
+    observed_at TEXT NOT NULL,
+
+    FOREIGN KEY (tracker_id)
+        REFERENCES trackers(id)
+);
+"""
+
+_CREATE_IDX_FARE_TRACKER_ID = """
+CREATE INDEX IF NOT EXISTS idx_fare_tracker_id
+ON fare_observations(tracker_id);
+"""
+
+_CREATE_IDX_FARE_OBSERVED_AT = """
+CREATE INDEX IF NOT EXISTS idx_fare_observed_at
+ON fare_observations(observed_at);
+"""
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TRACKER MODEL
+# ──────────────────────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True, slots=True)
 class Tracker:
-    """In-memory representation of a row from the ``trackers`` table.
-
-    All fields map 1-to-1 to database columns.  ``id`` and ``created_at``
-    are ``None`` before the row has been persisted.
-    """
-
     chat_id: str
-    source: str
-    destination: str
+    source_name: str
+    source_id: int
+    destination_name: str
+    destination_id: int
     journey_date: date
     active: bool = True
     id: Optional[int] = None
     created_at: Optional[datetime] = None
 
-    # ── Factories ─────────────────────────────────────────────────────────────
-
     @classmethod
-    def from_row(cls, row: sqlite3.Row) -> Tracker:
-        """Construct a ``Tracker`` from a ``sqlite3.Row`` (column-name access).
-
-        Args:
-            row: A row returned from a query against the ``trackers`` table.
-
-        Returns:
-            A fully populated ``Tracker`` instance.
-        """
+    def from_row(cls, row: sqlite3.Row) -> "Tracker":
         return cls(
             id=row["id"],
             chat_id=row["chat_id"],
@@ -81,33 +117,27 @@ class Tracker:
             ),
         )
 
-    # ── Helpers ───────────────────────────────────────────────────────────────
-
     @property
     def route_label(self) -> str:
-        """Human-readable route string, e.g. ``'HYD → BLR'``."""
         return f"{self.source} → {self.destination}"
 
 
-# ── Table creation ────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# TABLE CREATION
+# ──────────────────────────────────────────────────────────────────────────────
 
 def create_tables(db_path: str | None = None) -> None:
-    """Create the ``trackers`` table and its indexes if they do not exist.
-
-    Idempotent — safe to call on every application startup without risk of
-    data loss or duplicate schema objects.
-
-    Args:
-        db_path: Optional path to the SQLite file.  When ``None`` the default
-                 path configured in ``database.py`` is used.  Pass
-                 ``':memory:'`` in tests.
-    """
     kwargs = {"db_path": db_path} if db_path is not None else {}
 
     logger.info("Creating tables (if not exist).")
+
     with connection(**kwargs) as conn:
         conn.execute(_CREATE_TRACKERS)
         conn.execute(_CREATE_IDX_CHAT_ACTIVE)
         conn.execute(_CREATE_IDX_JOURNEY_DATE)
 
-    logger.info("Table 'trackers' and indexes are ready.")
+        conn.execute(_CREATE_FARE_OBSERVATIONS)
+        conn.execute(_CREATE_IDX_FARE_TRACKER_ID)
+        conn.execute(_CREATE_IDX_FARE_OBSERVED_AT)
+
+    logger.info("Database tables ready.")

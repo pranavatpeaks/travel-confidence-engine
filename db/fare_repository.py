@@ -1,0 +1,202 @@
+from __future__ import annotations
+
+from typing import Iterable
+
+from db.database import connection
+from scrapers.models import FareObservation
+
+
+def insert_fare_observation(
+    tracker_id: int,
+    observation: FareObservation,
+) -> int:
+
+    with connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO fare_observations (
+                tracker_id,
+                platform,
+                operator,
+                fare,
+                seats_available,
+                observed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                tracker_id,
+                observation.platform,
+                observation.operator,
+                observation.fare,
+                observation.seats_available,
+                observation.observed_at.isoformat(),
+            ),
+        )
+
+        return int(cursor.lastrowid)
+
+
+def insert_many_observations(
+    tracker_id: int,
+    observations: Iterable[FareObservation],
+) -> int:
+
+    rows = [
+        (
+            tracker_id,
+            obs.platform,
+            obs.operator,
+            obs.fare,
+            obs.seats_available,
+            obs.observed_at.isoformat(),
+        )
+        for obs in observations
+    ]
+
+    if not rows:
+        return 0
+
+    with connection() as conn:
+        conn.executemany(
+            """
+            INSERT INTO fare_observations (
+                tracker_id,
+                platform,
+                operator,
+                fare,
+                seats_available,
+                observed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
+
+    return len(rows)
+
+
+def count_observations() -> int:
+
+    with connection() as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM fare_observations
+            """
+        ).fetchone()
+
+    return int(row[0])
+
+
+def get_latest_observations(
+    tracker_id: int,
+    limit: int = 20,
+) -> list[dict]:
+
+    with connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM fare_observations
+            WHERE tracker_id = ?
+            ORDER BY observed_at DESC
+            LIMIT ?
+            """,
+            (tracker_id, limit),
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
+
+def get_latest_fare_for_tracker(
+    tracker_id: int,
+) -> dict | None:
+
+    with connection() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM fare_observations
+            WHERE tracker_id = ?
+            ORDER BY observed_at DESC
+            LIMIT 1
+            """,
+            (tracker_id,),
+        ).fetchone()
+
+    return dict(row) if row else None
+
+
+def get_lowest_fare_for_tracker(
+    tracker_id: int,
+) -> dict | None:
+
+    with connection() as conn:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM fare_observations
+            WHERE tracker_id = ?
+            ORDER BY fare ASC
+            LIMIT 1
+            """,
+            (tracker_id,),
+        ).fetchone()
+
+    return dict(row) if row else None
+
+def get_tracker_statistics(
+    tracker_id: int,
+) -> dict:
+    """
+    Return aggregate statistics for a tracker.
+    """
+
+    with connection() as conn:
+
+        stats = conn.execute(
+            """
+            SELECT
+                MIN(fare) AS lowest_fare,
+                MAX(fare) AS highest_fare,
+                COUNT(*) AS observations
+            FROM fare_observations
+            WHERE tracker_id = ?
+            """,
+            (
+                tracker_id,
+            ),
+        ).fetchone()
+
+        latest = conn.execute(
+            """
+            SELECT
+                fare,
+                operator,
+                seats_available,
+                observed_at
+            FROM fare_observations
+            WHERE tracker_id = ?
+            ORDER BY observed_at DESC
+            LIMIT 1
+            """,
+            (
+                tracker_id,
+            ),
+        ).fetchone()
+
+    return {
+        "lowest_fare": stats["lowest_fare"],
+        "highest_fare": stats["highest_fare"],
+        "observations": stats["observations"],
+
+        "latest_fare": latest["fare"] if latest else None,
+        "latest_operator": latest["operator"] if latest else None,
+        "latest_seats": latest["seats_available"] if latest else None,
+        "latest_observed_at": (
+            latest["observed_at"]
+            if latest
+            else None
+        ),
+    }

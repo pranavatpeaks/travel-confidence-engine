@@ -7,29 +7,91 @@ from db.database import connection
 
 def create_tracker(
     chat_id: str,
-    source: str,
-    destination: str,
+
+    source_name: str,
+    source_id: int,
+
+    destination_name: str,
+    destination_id: int,
+
     journey_date: str,
 ) -> dict[str, Any]:
     """
-    Create a new tracker and return the created record.
+    Create a tracker.
+
+    If the same tracker already exists but is inactive,
+    reactivate it instead of creating a new row.
     """
 
     with connection() as conn:
-        cursor = conn.execute(
+
+        existing = conn.execute(
             """
-            INSERT INTO trackers (
-                chat_id,
-                source,
-                destination,
-                journey_date
-            )
-            VALUES (?, ?, ?, ?)
+            SELECT *
+            FROM trackers
+            WHERE chat_id = ?
+              AND source_name = ?
+              AND destination_name = ?
+              AND journey_date = ?
             """,
             (
                 chat_id,
-                source,
-                destination,
+                source_name,
+                destination_name,
+                journey_date,
+            ),
+        ).fetchone()
+
+        if existing:
+
+            if existing["active"] == 0:
+
+                conn.execute(
+                    """
+                    UPDATE trackers
+                    SET active = 1
+                    WHERE id = ?
+                    """,
+                    (
+                        existing["id"],
+                    ),
+                )
+
+                row = conn.execute(
+                    """
+                    SELECT *
+                    FROM trackers
+                    WHERE id = ?
+                    """,
+                    (
+                        existing["id"],
+                    ),
+                ).fetchone()
+
+                return dict(row)
+
+            raise ValueError(
+                "Tracker already exists and is active."
+            )
+
+        cursor = conn.execute(
+            """
+            INSERT INTO trackers (
+                    chat_id,
+                    source_name,
+                    source_id,
+                    destination_name,
+                    destination_id,
+                    journey_date
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                chat_id,
+                source_name,
+                source_id,
+                destination_name,
+                destination_id,
                 journey_date,
             ),
         )
@@ -42,18 +104,16 @@ def create_tracker(
             FROM trackers
             WHERE id = ?
             """,
-            (tracker_id,),
+            (
+                tracker_id,
+            ),
         ).fetchone()
 
     return dict(row)
 
-
 def get_active_trackers(
     chat_id: str,
 ) -> list[dict[str, Any]]:
-    """
-    Return all active trackers for a Telegram user.
-    """
 
     with connection() as conn:
         rows = conn.execute(
@@ -70,17 +130,30 @@ def get_active_trackers(
     return [dict(row) for row in rows]
 
 
+def get_all_active_trackers() -> list[dict[str, Any]]:
+    """
+    Used by the orchestrator.
+
+    Returns every active tracker in the system.
+    """
+
+    with connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM trackers
+            WHERE active = 1
+            ORDER BY created_at DESC
+            """
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
+
 def deactivate_tracker(
     tracker_id: int,
     chat_id: str,
 ) -> bool:
-    """
-    Deactivate a tracker belonging to a user.
-
-    Returns:
-        True if tracker was found and deactivated.
-        False otherwise.
-    """
 
     with connection() as conn:
         cursor = conn.execute(
@@ -104,9 +177,6 @@ def get_tracker_by_id(
     tracker_id: int,
     chat_id: str,
 ) -> dict[str, Any] | None:
-    """
-    Fetch a single tracker.
-    """
 
     with connection() as conn:
         row = conn.execute(

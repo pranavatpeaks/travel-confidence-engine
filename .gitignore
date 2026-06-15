@@ -1,5 +1,7 @@
 .venv/
-.env
 __pycache__/
 *.pyc
-.vscode/
+.env
+travel_confidence.db
+.DS_Store
+.pytest_cache/

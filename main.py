@@ -6,13 +6,16 @@ import sys
 from telegram import __version__ as TG_VERSION
 from telegram.ext import Application
 
-from config import get_settings
 from bot.handlers import register_handlers
+from config import get_settings
+from core.scheduler import (
+    start_scheduler,
+    stop_scheduler,
+)
 from db.models import create_tables
 
 
 def configure_logging(log_level: int) -> None:
-    """Set up root logger and silence noisy third-party libraries."""
 
     logging.basicConfig(
         format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -27,7 +30,6 @@ def configure_logging(log_level: int) -> None:
 
 
 def build_application(token: str) -> Application:
-    """Construct and return Telegram application."""
 
     return (
         Application.builder()
@@ -40,7 +42,9 @@ def main() -> None:
 
     settings = get_settings()
 
-    configure_logging(settings.log_level_int)
+    configure_logging(
+        settings.log_level_int
+    )
 
     logger = logging.getLogger(__name__)
 
@@ -51,12 +55,14 @@ def main() -> None:
         settings.log_level,
     )
 
-    # Database bootstrap
     create_tables()
 
-    logger.info("Database ready.")
+    logger.info(
+        "Database ready."
+    )
 
-    # Telegram bot
+    start_scheduler()
+
     app = build_application(
         settings.bot_token
     )
@@ -67,12 +73,20 @@ def main() -> None:
         "Handlers registered — entering polling loop."
     )
 
-    app.run_polling(
-        drop_pending_updates=True,
-        close_loop=True,
-    )
+    try:
 
-    logger.info("Bot stopped cleanly.")
+        app.run_polling(
+            drop_pending_updates=True,
+            close_loop=True,
+        )
+
+    finally:
+
+        stop_scheduler()
+
+        logger.info(
+            "Bot stopped cleanly."
+        )
 
 
 if __name__ == "__main__":
