@@ -53,6 +53,9 @@ def insert_many_observations(
             tracker_id,
             obs.platform,
             obs.operator,
+            obs.bus_type,
+            int(obs.is_ac),
+            int(obs.is_sleeper),
             obs.fare,
             obs.seats_available,
             obs.observed_at.isoformat(),
@@ -70,17 +73,21 @@ def insert_many_observations(
                 tracker_id,
                 platform,
                 operator,
+                bus_type,
+                is_ac,
+                is_sleeper,
                 fare,
                 seats_available,
                 observed_at
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?, ?
+            )
             """,
             rows,
         )
 
     return len(rows)
-
 
 def count_observations() -> int:
 
