@@ -7,6 +7,8 @@ from telegram.ext import (
     ContextTypes,
 )
 
+from utils.datetime_utils import format_ist
+
 from core.parser import parse_track_command
 from core.tracker import (
     create_tracker,
@@ -367,7 +369,7 @@ async def history_handler(
                 f"{stats['latest_seats']}\n\n"
 
                 f"Last Updated:\n"
-                f"{stats['latest_observed_at']}"
+                f"{format_ist(stats['latest_observed_at'])}"
             )
         )
 
