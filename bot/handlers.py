@@ -165,6 +165,13 @@ async def status_handler(
             tracker["id"]
         )
 
+        logger.info(
+    "Tracker=%s Latest=%s Lowest=%s",
+    tracker["id"],
+    latest,
+    lowest,
+)
+
         lines.append(
             "━━━━━━━━━━━━━━"
         )
@@ -208,7 +215,7 @@ async def status_handler(
     await update.message.reply_text(
         "\n".join(lines)
     )
-    
+
 async def stop_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
