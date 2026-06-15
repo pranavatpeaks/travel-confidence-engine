@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
 
@@ -37,6 +38,17 @@ def build_application(
 
 
 def main() -> None:
+
+    try:
+        asyncio.get_event_loop()
+
+    except RuntimeError:
+
+        loop = asyncio.new_event_loop()
+
+        asyncio.set_event_loop(
+            loop
+        )
 
     settings = get_settings()
 
