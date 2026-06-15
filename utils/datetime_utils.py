@@ -15,5 +15,6 @@ def format_ist(
 
     return (
         dt.astimezone(IST)
-        .strftime("%d/%m/%Y %I:%M %p IST")
+        .strftime("%d/%m/%Y %I:%M %p")
+        + " IST"
     )

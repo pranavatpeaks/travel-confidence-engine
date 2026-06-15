@@ -166,11 +166,13 @@ async def status_handler(
         )
 
         lines.append(
-            (
-                f"#{tracker['id']} "
-                f"{tracker['source_name']} → "
-                f"{tracker['destination_name']}"
-            )
+            "━━━━━━━━━━━━━━"
+        )
+
+        lines.append(
+            f"#{tracker['id']} "
+            f"{tracker['source_name']} → "
+            f"{tracker['destination_name']}"
         )
 
         lines.append(
@@ -195,6 +197,8 @@ async def status_handler(
 
         if lowest:
 
+            lines.append("")
+
             lines.append(
                 f"Lowest Fare Seen: ₹{lowest['fare']}"
             )
@@ -204,7 +208,7 @@ async def status_handler(
     await update.message.reply_text(
         "\n".join(lines)
     )
-
+    
 async def stop_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
