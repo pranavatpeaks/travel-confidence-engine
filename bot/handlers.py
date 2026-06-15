@@ -1,5 +1,7 @@
 import logging
 
+from datetime import datetime
+
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -14,23 +16,17 @@ from core.tracker import (
     create_tracker,
     get_active_trackers,
     deactivate_tracker,
+    get_tracker_by_id,
 )
 
 from db.fare_repository import (
     get_cheapest_options_for_tracker,
+    get_tracker_statistics,
 )
 
 from scrapers.city_resolver import (
     resolve_city,
     CityNotFoundError,
-)
-
-from db.fare_repository import (
-    get_tracker_statistics,
-)
-
-from core.tracker import (
-    get_tracker_by_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -128,6 +124,7 @@ async def track_handler(
             f"Unexpected error: {exc}"
         )
 
+
 async def status_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -151,7 +148,7 @@ async def status_handler(
 
     lines = [
         "📋 Active Trackers",
-        ""
+        "",
     ]
 
     medals = [
@@ -162,9 +159,11 @@ async def status_handler(
 
     for tracker in trackers:
 
-        cheapest = get_cheapest_options_for_tracker(
-            tracker["id"],
-            limit=3,
+        cheapest = (
+            get_cheapest_options_for_tracker(
+                tracker["id"],
+                limit=3,
+            )
         )
 
         lines.append(
@@ -190,6 +189,7 @@ async def status_handler(
             )
 
             lines.append("")
+
             continue
 
         for idx, bus in enumerate(
@@ -210,6 +210,63 @@ async def status_handler(
                 bus["bus_type"]
             )
 
+            departure = bus.get(
+                "departure_time"
+            )
+
+            arrival = bus.get(
+                "arrival_time"
+            )
+
+            duration = bus.get(
+                "journey_duration_min"
+            )
+
+            if departure and arrival:
+
+                try:
+
+                    dep_time = (
+                        datetime.strptime(
+                            departure,
+                            "%Y-%m-%d %H:%M:%S",
+                        )
+                        .strftime(
+                            "%I:%M %p"
+                        )
+                    )
+
+                    arr_time = (
+                        datetime.strptime(
+                            arrival,
+                            "%Y-%m-%d %H:%M:%S",
+                        )
+                        .strftime(
+                            "%I:%M %p"
+                        )
+                    )
+
+                    lines.append(
+                        f"🕘 {dep_time} → {arr_time}"
+                    )
+
+                except Exception:
+                    pass
+
+            if duration:
+
+                hours = (
+                    int(duration) // 60
+                )
+
+                minutes = (
+                    int(duration) % 60
+                )
+
+                lines.append(
+                    f"⏱ {hours}h {minutes}m"
+                )
+
             lines.append(
                 f"Seats: {bus['seats_available']}"
             )
@@ -219,6 +276,7 @@ async def status_handler(
     await update.message.reply_text(
         "\n".join(lines)
     )
+
 
 async def stop_handler(
     update: Update,
@@ -235,7 +293,9 @@ async def stop_handler(
                 "Usage: /stop <tracker_id>"
             )
 
-        tracker_id = int(parts[1])
+        tracker_id = int(
+            parts[1]
+        )
 
         chat_id = str(
             update.effective_chat.id
@@ -265,6 +325,175 @@ async def stop_handler(
 
         await update.message.reply_text(
             str(exc)
+        )
+
+
+async def history_handler(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+
+    try:
+
+        if len(context.args) != 1:
+
+            await update.message.reply_text(
+                "Usage: /history <tracker_id>"
+            )
+
+            return
+
+        tracker_id = int(
+            context.args[0]
+        )
+
+        chat_id = str(
+            update.effective_chat.id
+        )
+
+        tracker = get_tracker_by_id(
+            tracker_id,
+            chat_id,
+        )
+
+        if not tracker:
+
+            await update.message.reply_text(
+                "Tracker not found."
+            )
+
+            return
+
+        stats = get_tracker_statistics(
+            tracker_id
+        )
+
+        message = (
+            f"📈 {tracker['source_name']} → "
+            f"{tracker['destination_name']}\n\n"
+
+            f"Date: {tracker['journey_date']}\n\n"
+
+            f"Observations: "
+            f"{stats['observations']}\n\n"
+
+            f"Lowest Fare Seen:\n"
+            f"₹{stats['lowest_fare']}\n\n"
+
+            f"Highest Fare Seen:\n"
+            f"₹{stats['highest_fare']}\n\n"
+
+            f"Current Fare:\n"
+            f"₹{stats['latest_fare']}\n\n"
+
+            f"Current Operator:\n"
+            f"{stats['latest_operator']}\n\n"
+        )
+
+        if stats.get(
+            "latest_bus_type"
+        ):
+
+            message += (
+                f"Current Bus Type:\n"
+                f"{stats['latest_bus_type']}\n\n"
+            )
+
+        if (
+            stats.get(
+                "latest_departure_time"
+            )
+            and
+            stats.get(
+                "latest_arrival_time"
+            )
+        ):
+
+            try:
+
+                dep_time = (
+                    datetime.strptime(
+                        stats[
+                            "latest_departure_time"
+                        ],
+                        "%Y-%m-%d %H:%M:%S",
+                    )
+                    .strftime(
+                        "%I:%M %p"
+                    )
+                )
+
+                arr_time = (
+                    datetime.strptime(
+                        stats[
+                            "latest_arrival_time"
+                        ],
+                        "%Y-%m-%d %H:%M:%S",
+                    )
+                    .strftime(
+                        "%I:%M %p"
+                    )
+                )
+
+                message += (
+                    f"Departure → Arrival:\n"
+                    f"{dep_time} → "
+                    f"{arr_time}\n\n"
+                )
+
+            except Exception:
+                pass
+
+        if stats.get(
+            "latest_duration"
+        ):
+
+            hours = (
+                int(
+                    stats[
+                        "latest_duration"
+                    ]
+                )
+                // 60
+            )
+
+            minutes = (
+                int(
+                    stats[
+                        "latest_duration"
+                    ]
+                )
+                % 60
+            )
+
+            message += (
+                f"Journey Duration:\n"
+                f"{hours}h "
+                f"{minutes}m\n\n"
+            )
+
+        message += (
+            f"Current Seats:\n"
+            f"{stats['latest_seats']}\n\n"
+
+            f"Last Updated:\n"
+            f"{format_ist(stats['latest_observed_at'])}"
+        )
+
+        await update.message.reply_text(
+            message
+        )
+
+    except ValueError:
+
+        await update.message.reply_text(
+            "Usage: /history <tracker_id>"
+        )
+
+    except Exception as exc:
+
+        await update.message.reply_text(
+            f"Unexpected error: {exc}"
         )
 
 
@@ -308,94 +537,12 @@ def register_handlers(
     )
 
     app.add_handler(
-    CommandHandler(
-        "history",
-        history_handler,
+        CommandHandler(
+            "history",
+            history_handler,
+        )
     )
-)
 
     logger.info(
         "All command handlers registered."
     )
-
-async def history_handler(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
-
-    try:
-
-        if len(context.args) != 1:
-
-            await update.message.reply_text(
-                "Usage: /history <tracker_id>"
-            )
-
-            return
-
-        tracker_id = int(
-            context.args[0]
-        )
-
-        chat_id = str(
-            update.effective_chat.id
-        )
-
-        tracker = get_tracker_by_id(
-            tracker_id,
-            chat_id,
-        )
-
-        if not tracker:
-
-            await update.message.reply_text(
-                "Tracker not found."
-            )
-
-            return
-
-        stats = get_tracker_statistics(
-            tracker_id
-        )
-
-        await update.message.reply_text(
-            (
-                f"📈 {tracker['source_name']} → "
-                f"{tracker['destination_name']}\n\n"
-
-                f"Date: {tracker['journey_date']}\n\n"
-
-                f"Observations: "
-                f"{stats['observations']}\n\n"
-
-                f"Lowest Fare Seen:\n"
-                f"₹{stats['lowest_fare']}\n\n"
-
-                f"Highest Fare Seen:\n"
-                f"₹{stats['highest_fare']}\n\n"
-
-                f"Current Fare:\n"
-                f"₹{stats['latest_fare']}\n\n"
-
-                f"Current Operator:\n"
-                f"{stats['latest_operator']}\n\n"
-
-                f"Current Seats:\n"
-                f"{stats['latest_seats']}\n\n"
-
-                f"Last Updated:\n"
-                f"{format_ist(stats['latest_observed_at'])}"
-            )
-        )
-
-    except ValueError:
-
-        await update.message.reply_text(
-            "Usage: /history <tracker_id>"
-        )
-
-    except Exception as exc:
-
-        await update.message.reply_text(
-            f"Unexpected error: {exc}"
-        )

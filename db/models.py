@@ -68,6 +68,12 @@ CREATE TABLE IF NOT EXISTS fare_observations (
 
     is_sleeper INTEGER NOT NULL,
 
+    departure_time TEXT,
+
+    arrival_time TEXT,
+
+    journey_duration_min INTEGER,
+
     fare INTEGER NOT NULL,
 
     seats_available INTEGER NOT NULL,
@@ -151,6 +157,45 @@ class Tracker:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# MIGRATIONS
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _ensure_column(
+    conn,
+    column_name: str,
+    definition: str,
+) -> None:
+
+    columns = conn.execute(
+        """
+        PRAGMA table_info(
+            fare_observations
+        )
+        """
+    ).fetchall()
+
+    existing = {
+        row[1]
+        for row in columns
+    }
+
+    if column_name not in existing:
+
+        logger.info(
+            "Adding column: %s",
+            column_name,
+        )
+
+        conn.execute(
+            f"""
+            ALTER TABLE fare_observations
+            ADD COLUMN {column_name}
+            {definition}
+            """
+        )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # TABLE CREATION
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -192,6 +237,24 @@ def create_tables(
 
         conn.execute(
             _CREATE_IDX_FARE_OBSERVED_AT
+        )
+
+        _ensure_column(
+            conn,
+            "departure_time",
+            "TEXT",
+        )
+
+        _ensure_column(
+            conn,
+            "arrival_time",
+            "TEXT",
+        )
+
+        _ensure_column(
+            conn,
+            "journey_duration_min",
+            "INTEGER",
         )
 
     logger.info(

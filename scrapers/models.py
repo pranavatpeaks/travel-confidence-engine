@@ -20,6 +20,12 @@ class FareObservation:
 
     is_sleeper: bool
 
+    departure_time: str
+
+    arrival_time: str
+
+    journey_duration_min: int
+
     fare: int
 
     seats_available: int
