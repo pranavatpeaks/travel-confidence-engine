@@ -3,26 +3,17 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from core.orchestrator import collect_fares_once
 
 
-def scheduled_job():
-
-    print("Running collection cycle...")
-
-    collect_fares_once()
-
-    print("Collection cycle finished.")
-
-
 scheduler = BlockingScheduler()
 
 scheduler.add_job(
-    scheduled_job,
+    collect_fares_once,
     trigger="interval",
-    hours=1,
+    hours=3,
 )
 
 print(
     "Scheduler started "
-    "(collecting every 1 hour)"
+    "(collecting every 3 hours)"
 )
 
 scheduler.start()
