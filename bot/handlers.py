@@ -9,6 +9,10 @@ from telegram.ext import (
     ContextTypes,
 )
 
+from analytics.recommendation import (
+    get_recommendation,
+)
+
 from utils.datetime_utils import format_ist
 
 from core.parser import parse_track_command
@@ -52,6 +56,7 @@ async def help_handler(
             "/track SOURCE DESTINATION YYYY-MM-DD\n"
             "/status\n"
             "/history TRACKER_ID\n"
+            "/recommend TRACKER_ID\n"
             "/stop TRACKER_ID"
         )
     )
@@ -498,6 +503,116 @@ async def history_handler(
             f"Unexpected error: {exc}"
         )
 
+async def recommend_handler(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+
+    try:
+
+        if len(context.args) != 1:
+
+            await update.message.reply_text(
+                "Usage: /recommend <tracker_id>"
+            )
+
+            return
+
+        tracker_id = int(
+            context.args[0]
+        )
+
+        chat_id = str(
+            update.effective_chat.id
+        )
+
+        tracker = get_tracker_by_id(
+            tracker_id,
+            chat_id,
+        )
+
+        if not tracker:
+
+            await update.message.reply_text(
+                "Tracker not found."
+            )
+
+            return
+
+        recommendation = get_recommendation(
+            tracker_id
+        )
+
+        action = recommendation[
+            "action"
+        ].replace(
+            "_",
+            " "
+        )
+
+        emoji = {
+
+            "BOOK NOW": "🟢",
+
+            "BOOK SOON": "🟡",
+
+            "WAIT": "🔵",
+
+            "MONITOR": "⚪",
+
+            "UNKNOWN": "⚫",
+
+        }.get(
+            action,
+            "⚫",
+        )
+
+        message = (
+            "🧠 Travel Confidence Engine\n\n"
+
+            f"Route\n"
+
+            f"{tracker['source_name']} → "
+            f"{tracker['destination_name']}\n\n"
+
+            f"{emoji} Recommendation\n"
+
+            f"{action}\n\n"
+
+            f"Confidence\n"
+
+            f"{recommendation['confidence']}%\n\n"
+
+            f"{recommendation['summary']}"
+        )
+
+        if recommendation["reasons"]:
+
+            message += "\n\nWhy?\n"
+
+            for reason in recommendation[
+                "reasons"
+            ]:
+
+                message += (
+                    f"\n• {reason}"
+                )
+
+        await update.message.reply_text(
+            message
+        )
+
+    except ValueError:
+
+        await update.message.reply_text(
+            "Usage: /recommend <tracker_id>"
+        )
+
+    except Exception as exc:
+
+        await update.message.reply_text(
+            f"Unexpected error: {exc}"
+        )
 
 def register_handlers(
     app: Application,
@@ -544,6 +659,13 @@ def register_handlers(
             history_handler,
         )
     )
+
+    app.add_handler(
+    CommandHandler(
+        "recommend",
+        recommend_handler,
+    )
+)
 
     logger.info(
         "All command handlers registered."
